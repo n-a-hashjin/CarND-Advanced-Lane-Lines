@@ -281,7 +281,12 @@ def path_visualization(frame, Minv, left_poly, right_poly, leftx, lefty, rightx,
     img[righty, rightx] = [0, 0, 255]
     img = cv2.addWeighted(img, 1, road_poly, 0.3, 0)
     unwarped = cv2.warpPerspective(img, Minv, (img.shape[1],img.shape[0]), flags=cv2.INTER_LINEAR)
-    out_image = cv2.addWeighted(frame, 1, unwarped, 2, 0)
+    # crop unwarped
+    mask = np.zeros_like(frame)
+    mask[450::,:,:] = 255
+    masked_unwarped = cv2.bitwise_and(unwarped, mask)
+
+    out_image = cv2.addWeighted(frame, 1, masked_unwarped, 2, 0)
     return out_image
 
 def pipeline(frame, left_poly, right_poly):
@@ -298,7 +303,7 @@ def pipeline(frame, left_poly, right_poly):
 cap = cv2.VideoCapture('project_video.mp4')
 # Define the codec and create VideoWriter object
 fourcc = cv2.VideoWriter_fourcc(*'XVID')
-out = cv2.VideoWriter('output.mp$',fourcc, 20.0, (1280,720))
+out = cv2.VideoWriter('output.mp4',fourcc, 20.0, (1280,720))
 
 left_poly = []
 right_poly = []
@@ -312,7 +317,7 @@ while True:
     except:
         pass
     cv2.imshow('warped', out_img)
-    #out.write(out_img)
+    out.write(out_img)
     if cv2.waitKey(1) & 0xFF == ord('q'):
         break
 
