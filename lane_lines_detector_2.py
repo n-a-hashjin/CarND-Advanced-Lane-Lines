@@ -217,7 +217,7 @@ def search_around_poly(binary_warped, left_poly, right_poly):
 def find_path(binary_warped, left_poly, right_poly):
     try:
         leftx, lefty, rightx, righty = search_around_poly(binary_warped, left_poly, right_poly)
-    except IndexError:
+    except:
         print('search from scratch!!!!!')
         leftx, lefty, rightx, righty = find_lane_pixels(binary_warped)
         pass
@@ -225,9 +225,12 @@ def find_path(binary_warped, left_poly, right_poly):
 
 def fit_poly(img_shape, leftx, lefty, rightx, righty):
     # Fit a second order polynomial to each using `np.polyfit`
-    left_poly = np.polyfit(lefty, leftx, 2)
-    right_poly = np.polyfit(righty, rightx, 2)
-
+    try:
+        left_poly = np.polyfit(lefty, leftx, 2)
+        right_poly = np.polyfit(righty, rightx, 2)
+    except:
+        left_poly = []
+        right_poly = []
     return left_poly, right_poly
 
 def path_visualization(frame, Minv, left_line, right_line):
@@ -247,13 +250,17 @@ def path_visualization(frame, Minv, left_line, right_line):
     left_side = np.transpose(np.vstack((left_fitx, ploty)))
     right_side = np.flipud(np.transpose(np.vstack((right_fitx, ploty))))
     road_poly_pts = np.array([np.vstack((left_side, right_side))])
-    cv2.fillPoly(road_poly, np.int_(road_poly_pts), (0, 255, 0))
+    if (left_line.detected & right_line.detected) == True:
+        cv2.fillPoly(road_poly, np.int_(road_poly_pts), (0, 255, 0))
+    else:
+        print('hiiii')
+        cv2.fillPoly(road_poly, np.int_(road_poly_pts), (0, 0, 255))
 
     img = np.zeros_like(frame)
     # Colors in the left and right lane regions
     img[lefty, leftx] = [255, 0, 0]
     img[righty, rightx] = [0, 0, 255]
-    img = cv2.addWeighted(img, 1, road_poly, 0.3, 0)
+    img = cv2.addWeighted(img, 1, road_poly, 1, 0)
     unwarped = cv2.warpPerspective(img, Minv, (img.shape[1],img.shape[0]), flags=cv2.INTER_LINEAR)
     # crup unwarped
     mask = np.zeros_like(frame)
@@ -262,27 +269,27 @@ def path_visualization(frame, Minv, left_line, right_line):
 
     out_image = cv2.addWeighted(frame, 1, masked_unwarped, 0.3, 0)
 
-    cv2.putText(out_image, "Right curvature:        {:.3f}m".format(right_line.radius_of_curvature), (800,100), cv2.FONT_HERSHEY_PLAIN, 1.5, (0,0,200),2)
-    cv2.putText(out_image, "Distance from right:    {:.3f}m".format(right_line.line_base_pos), (800,150), cv2.FONT_HERSHEY_PLAIN, 1.5, (0,0,200),2)
+    cv2.putText(out_image, "Right curvature:        {:.2f}m".format(right_line.radius_of_curvature), (800,100), cv2.FONT_HERSHEY_PLAIN, 1.5, (0,0,200),2)
+    cv2.putText(out_image, "Distance from right:    {:.2f}m".format(right_line.line_base_pos), (800,150), cv2.FONT_HERSHEY_PLAIN, 1.5, (0,0,200),2)
 
-    cv2.putText(out_image, "Left curvature:        {:.3f}m".format(left_line.radius_of_curvature), (100,100), cv2.FONT_HERSHEY_PLAIN, 1.5, (250,0,0),2)
-    cv2.putText(out_image, "Distance from left:    {:.3f}m".format(left_line.line_base_pos), (100,150), cv2.FONT_HERSHEY_PLAIN, 1.5, (250,0,0),2)
-
+    cv2.putText(out_image, "Left curvature:        {:.2f}m".format(left_line.radius_of_curvature), (100,100), cv2.FONT_HERSHEY_PLAIN, 1.5, (250,0,0),2)
+    cv2.putText(out_image, "Distance from left:    {:.2f}m".format(left_line.line_base_pos), (100,150), cv2.FONT_HERSHEY_PLAIN, 1.5, (250,0,0),2)
+    cv2.putText(out_image, "Center offset:    {:.2f}m ".format(left_line.line_base_pos-1.85), (500,350), cv2.FONT_HERSHEY_PLAIN, 1.5, (255,0,255),2)
 
     return out_image
 
-def pipeline(frame, left_poly, right_poly):
+def pipeline(frame, left_line, right_line):
 
     binary_img = binary_image(frame, mode="hsv_filter") #, mode="hsv_filter"
     binary_warped = bird_eye(binary_img, camera_parameters)
-    leftx, lefty, rightx, righty = find_path(binary_warped, left_poly, right_poly)
+    leftx, lefty, rightx, righty = find_path(binary_warped, left_line.current_fit, right_line.current_fit)
     left_poly, right_poly = fit_poly(binary_warped.shape, leftx, lefty, rightx, righty)
 
     left_line.get_newline(left_poly, leftx, lefty)
     right_line.get_newline(right_poly, rightx, righty)
 
     out_img = path_visualization(frame, camera_parameters["Minv"], left_line, right_line)
-    return out_img, left_poly, right_poly
+    return out_img, left_line, right_line
 
 class Line():
     def __init__(self, y_size, x_size):
@@ -311,29 +318,47 @@ class Line():
         self.ploty = np.linspace(0, y_size-1, y_size)
         self.center_point = np.int(x_size/2)
     def get_newline(self, new_fit, allx, ally):
-
-        self.detected = True
-        self.diffs = self.current_fit - new_fit
-        self.current_fit = new_fit
-        self.allx = allx
-        self.ally = ally
-        if len(self.recent_fitted_poly) == 10:
+        if len(new_fit) == 0:
+            self.detected = False
+            self.current_fit = [np.array([False])]
+            self.diffs = np.array([0,0,0], dtype='float')
+            self.allx = None
+            self.ally = None
             self.recent_fitted_poly = self.recent_fitted_poly[1::]
+            self.best_fit = np.average(np.array(self.recent_fitted_poly), axis=0)
 
-        self.recent_fitted_poly.append(new_fit)
-        self.best_fit = np.average(np.array(self.recent_fitted_poly), axis=0)
+            new_fitx = (self.best_fit[0]*self.ploty**2 + self.best_fit[1]*self.ploty + self.best_fit[2])
 
-        new_fitx = (self.best_fit[0]*self.ploty**2 + self.best_fit[1]*self.ploty + self.best_fit[2])
-
-        if len(self.recent_xfitted) == 10:
             self.recent_xfitted = self.recent_xfitted[1::]
-        self.recent_xfitted.append(new_fitx)
-        self.bestx = np.average(np.array(self.recent_xfitted), axis=0)
+            self.bestx = np.average(np.array(self.recent_xfitted), axis=0)
 
-        fitted_m = np.polyfit(self.ploty * 80/720, self.bestx * 3.7/810, 2)
-        y_eval = np.max(self.ploty * 80/720)
-        self.radius_of_curvature = ((1 + (2*fitted_m[0]*y_eval + fitted_m[1])**2)**1.5)/(2*fitted_m[0])
-        self.line_base_pos = np.absolute(self.center_point - self.bestx[-1]) * 3.7/810
+            fitted_m = np.polyfit(self.ploty * 80/720, self.bestx * 3.7/810, 2)
+            y_eval = np.max(self.ploty * 80/720)
+            self.radius_of_curvature = ((1 + (2*fitted_m[0]*y_eval + fitted_m[1])**2)**1.5)/(2*fitted_m[0])
+            self.line_base_pos = np.absolute(self.center_point - self.bestx[-1]) * 3.7/810
+        else:
+            self.detected = True
+            self.diffs = self.current_fit - new_fit
+            self.current_fit = new_fit
+            self.allx = allx
+            self.ally = ally
+            if len(self.recent_fitted_poly) == 10:
+                self.recent_fitted_poly = self.recent_fitted_poly[1::]
+
+            self.recent_fitted_poly.append(new_fit)
+            self.best_fit = np.average(np.array(self.recent_fitted_poly), axis=0)
+
+            new_fitx = (self.best_fit[0]*self.ploty**2 + self.best_fit[1]*self.ploty + self.best_fit[2])
+
+            if len(self.recent_xfitted) == 10:
+                self.recent_xfitted = self.recent_xfitted[1::]
+            self.recent_xfitted.append(new_fitx)
+            self.bestx = np.average(np.array(self.recent_xfitted), axis=0)
+
+            fitted_m = np.polyfit(self.ploty * 80/720, self.bestx * 3.7/810, 2)
+            y_eval = np.max(self.ploty * 80/720)
+            self.radius_of_curvature = ((1 + (2*fitted_m[0]*y_eval + fitted_m[1])**2)**1.5)/(2*fitted_m[0])
+            self.line_base_pos = np.absolute(self.center_point - self.bestx[-1]) * 3.7/810
         return self
 
 # create left and right lines objects
@@ -343,23 +368,21 @@ right_line = Line(720,1280)
 cap = cv2.VideoCapture('project_video.mp4')
 # Define the codec and create VideoWriter object
 fourcc = cv2.VideoWriter_fourcc(*'XVID')
-#out = cv2.VideoWriter('output-project.avi',fourcc, 20.0, (1280,720))
+out = cv2.VideoWriter('output-project.avi',fourcc, 20.0, (1280,720))
 
-left_poly = []
-right_poly = []
 start_time = time.time()
 while True:
     _, frame = cap.read()
     if frame is None:
         break
-    out_img, left_poly, right_poly = pipeline(frame, left_poly, right_poly)
+    out_img, left_poly, right_poly = pipeline(frame, left_line, right_line)
     cv2.imshow('warped', out_img)
-    #out.write(out_img)
+    out.write(out_img)
     if cv2.waitKey(1) & 0xFF == ord('q'):
         break
 
 print("--- %s seconds ---" % (time.time() - start_time))
 #release video objects
 cap.release()
-#out.release()
+out.release()
 cv2.destroyAllWindows()
