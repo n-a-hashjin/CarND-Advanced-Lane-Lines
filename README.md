@@ -149,6 +149,7 @@ offset = (center_of_car - center_of_lane_lines)* xm_per_pixel
 ![alt text][image10]
 
 #### 6. Plotted back down onto the road!
+
 I implemented this step in 19th code cell `yet_another_file.py` in the function `map_lane()`.  Here is an example of my result on a test image:
 
 ```python
@@ -169,6 +170,10 @@ The first and second below images show the warped image and unwarped image.
 ![alt text][image12]
 
 ---
+#### 7. Keep Track of Everything
+
+To keep track of information in every iteration we have defined ```Line()``` class. it saves most important information in every iteration and keep some of them for next 10 iteration. It automatically run an average function on last polinomial of line for example. In this way we can avoid jitter or loosing track of line when in one or a few frames the system fails to detect line. This class is defined in 21st code cell of IPython notebook.
+
 
 ### Pipeline (video)
 
@@ -180,6 +185,5 @@ Here's a [link to my video result](./output_videos/output_video.mp4)
 ---
 
 ### Discussion
-
 
 I have applied above steps and after running the pipeline under different binarization threshold and methods I founded out that it can be very critical criteria. When the lighting conditions changes or the lane lines fade or any change in color of road can affect my pipline effectiveness. Applying another filter for reject unrelated and unwanted noises like the given examples can be helpfull. This algorithm is also very likely to fail for fast changes in direction of lane lines. It could need more smarter decision making maybe!
