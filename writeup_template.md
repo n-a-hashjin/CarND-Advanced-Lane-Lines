@@ -1,6 +1,6 @@
-## Writeup Template
+## Self-Driving Car Nanodegree at Udacity
 
-### You can use this file as a template for your writeup if you want to submit it as a markdown file, but feel free to use some other method and submit a pdf if you prefer.
+### Second Project
 
 ---
 
@@ -18,14 +18,22 @@ The goals / steps of this project are the following:
 * Output visual display of the lane boundaries and numerical estimation of lane curvature and vehicle position.
 
 [//]: # (Image References)
-
-[image1]: ./examples/undistort_output.png "Undistorted"
-[image2]: ./test_images/test1.jpg "Road Transformed"
-[image3]: ./examples/binary_combo_example.jpg "Binary Example"
-[image4]: ./examples/warped_straight_lines.jpg "Warp Example"
-[image5]: ./examples/color_fit_lines.jpg "Fit Visual"
-[image6]: ./examples/example_output.jpg "Output"
-[video1]: ./project_video.mp4 "Video"
+[image0]: ./output_images/corners.JPG "camera calibration"
+[image1]: ./output_images/undistort.JPG "Undistorted"
+[image2]: ./output_images/warped_img.JPG "Birds-eye view"
+[image3]: ./output_images/sobel_x.JPG "X-direction Sobel"
+[image4]: ./output_images/color_filter.JPG "color filtered in HSV color space"
+[image5]: ./output_images/binarized_img.JPG "comparing 3 methodes"
+[image6]: ./output_images/histogram.JPG "Histogram"
+[image7]: ./output_images/lane_pixel.JPG "detect left and right lane pixels"
+[image8]: ./output_images/road_visualization.JPG "fit polynomial and plot toad path"
+[image9]: ./output_images/radius_of_curvature.JPG "Find radius of curvature near vehicle"
+[image10]: ./output_images/offset.JPG "distance from center"
+[image11]: ./output_images/search_around_poly.JPG "search around poly to find lane lines pixels"
+[image12]: ./output_images/unwarped_img.JPG "warp back on the road"
+[image13]: ./output_images/out_put.JPG "appearance of output frames"
+[image14]: ./output_images/undistorted_road.JPG "orginal and undistorted image from car camera"
+[video1]: ./output_videos/output_video.mp4 "Video"
 
 ## [Rubric](https://review.udacity.com/#!/rubrics/571/view) Points
 
@@ -35,80 +43,105 @@ The goals / steps of this project are the following:
 
 ### Writeup / README
 
-#### 1. Provide a Writeup / README that includes all the rubric points and how you addressed each one.  You can submit your writeup as markdown or pdf.  [Here](https://github.com/udacity/CarND-Advanced-Lane-Lines/blob/master/writeup_template.md) is a template writeup for this project you can use as a guide and a starting point.  
+#### 1. Provide a Writeup / README that includes all the rubric points and how I addressed each one. 
 
 You're reading it!
 
 ### Camera Calibration
 
-#### 1. Briefly state how you computed the camera matrix and distortion coefficients. Provide an example of a distortion corrected calibration image.
+The code for this step is contained in the Second code cell of the IPython notebook after We import some useful and necessary packages like OpenCV, located in "./advance_lane_lines.ipynb" .  
 
-The code for this step is contained in the first code cell of the IPython notebook located in "./examples/example.ipynb" (or in lines # through # of the file called `some_file.py`).  
-
-I start by preparing "object points", which will be the (x, y, z) coordinates of the chessboard corners in the world. Here I am assuming the chessboard is fixed on the (x, y) plane at z=0, such that the object points are the same for each calibration image.  Thus, `objp` is just a replicated array of coordinates, and `objpoints` will be appended with a copy of it every time I successfully detect all chessboard corners in a test image.  `imgpoints` will be appended with the (x, y) pixel position of each of the corners in the image plane with each successful chessboard detection.  
+I start by preparing "object points", which will be the (x, y, z) coordinates of the chessboard corners in the world. Here I am assuming the chessboard is fixed on the (x, y) plane at z=0, such that the object points are the same for each calibration image.  Thus, `objp` is just a replicated array of coordinates, and `objpoints` will be appended with a copy of it every time I successfully detect all chessboard corners in a test image.  `imgpoints` will be appended with the (x, y) pixel position of each of the corners in the image plane with each successful chessboard detection.
+It is also should be considered that our chessbord printout for calibration is consist of 9 by 6 corners, in other word our chessboard size is 9x6.
 
 I then used the output `objpoints` and `imgpoints` to compute the camera calibration and distortion coefficients using the `cv2.calibrateCamera()` function.  I applied this distortion correction to the test image using the `cv2.undistort()` function and obtained this result: 
 
+![alt text][image0]
 ![alt text][image1]
 
 ### Pipeline (single images)
 
-#### 1. Provide an example of a distortion-corrected image.
+#### 1. Distortion-corrected image.
 
-To demonstrate this step, I will describe how I apply the distortion correction to one of the test images like this one:
-![alt text][image2]
+After in first step we get the camera paramiters now we can apply it to images from the camera and get undistorted images. For this purpose we use `cv2.undistort()`. Applying this method to a test image will result in this:
 
-#### 2. Describe how (and identify where in your code) you used color transforms, gradients or other methods to create a thresholded binary image.  Provide an example of a binary image result.
+![alt text][image14]
 
-I used a combination of color and gradient thresholds to generate a binary image (thresholding steps at lines # through # in `another_file.py`).  Here's an example of my output for this step.  (note: this is not actually from one of the test images)
 
-![alt text][image3]
+#### 2. HSV color selection and sobel-x gradient to create a thresholded binary image.
 
-#### 3. Describe how (and identify where in your code) you performed a perspective transform and provide an example of a transformed image.
+I used a combination of color and gradient thresholds to generate a binary image (thresholding steps at 5, 7 and 9th code cells of IPython notebook located in "./advance_lane_lines.ipynb").
 
-The code for my perspective transform includes a function called `warper()`, which appears in lines 1 through 8 in the file `example.py` (output_images/examples/example.py) (or, for example, in the 3rd code cell of the IPython notebook).  The `warper()` function takes as inputs an image (`img`), as well as source (`src`) and destination (`dst`) points.  I chose the hardcode the source and destination points in the following manner:
-
-```python
-src = np.float32(
-    [[(img_size[0] / 2) - 55, img_size[1] / 2 + 100],
-    [((img_size[0] / 6) - 10), img_size[1]],
-    [(img_size[0] * 5 / 6) + 60, img_size[1]],
-    [(img_size[0] / 2 + 55), img_size[1] / 2 + 100]])
-dst = np.float32(
-    [[(img_size[0] / 4), 0],
-    [(img_size[0] / 4), img_size[1]],
-    [(img_size[0] * 3 / 4), img_size[1]],
-    [(img_size[0] * 3 / 4), 0]])
-```
-
-This resulted in the following source and destination points:
-
-| Source        | Destination   | 
-|:-------------:|:-------------:| 
-| 585, 460      | 320, 0        | 
-| 203, 720      | 320, 720      |
-| 1127, 720     | 960, 720      |
-| 695, 460      | 960, 0        |
-
-I verified that my perspective transform was working as expected by drawing the `src` and `dst` points onto a test image and its warped counterpart to verify that the lines appear parallel in the warped image.
+In 5th code cell of IPython notebook we have applied a color filter in hsv color space `hsv_filter()`. By setting color range for upper and lower color spectrum of white and yellow colors we will be able to detect lane lines very Well. However in dark places or bad lighting conditions sometimes it fails to detect lane lines.
+Here's an example of my output for this function.
 
 ![alt text][image4]
 
-#### 4. Describe how (and identify where in your code) you identified lane-line pixels and fit their positions with a polynomial?
+In 7th code cell of IPython notebook there is a sobelx function, `name sobel_x()`. Sobelx direction derivation is performed on a grayscale image of undistorted image. In IPython notebook it is performed and demonstrated for all images in "./test_images" directory. Sobelx will find vertical lines very well, however under shadowing or different colors and changes in road it shows unwanted vertical lines.
+Here's an example of my output for this function.
 
-Then I did some other stuff and fit my lane lines with a 2nd order polynomial kinda like this:
+![alt text][image3]
+
+In 9th code cell we have combined these 2 methods and the results of these 3 binarized image is shown in below example:
 
 ![alt text][image5]
 
+#### 3. Perspective transform
+
+The code for my perspective transform includes a function called `warp_image()`, which appears in lines 1 through 4 in the 22nd code cell of IPython notebook `advance_lane_lines.ipynb` (./advance_lane_lines.ipynb).  The `warp_image()` function takes as inputs an image (`img`), and returns warped image or birds-eye view.
+To use `warp_image()` functio we need first calculate Transform Matrices. I chose the hardcode the source and destination points in the following manner:
+
+```python
+# src and dst for perspective transform
+src = np.float32([[583,455],[219,690],[1059,690],[695,455]])
+dst = np.float32([[280,0],[280,720],[1000,720],[1000,0]])
+
+M = cv2.getPerspectiveTransform(src, dst)
+Minv = cv2.getPerspectiveTransform(dst, src)
+```
+**the selected points are base on an isosceles trapezoid to represent strait lines in parallel form and vertical shape in warped image**
+
+I verified that my perspective transform was working as expected by drawing the `src` and `dst` points onto a test image and its warped counterpart to verify that the lines appear parallel in the warped image.
+
+![alt text][image2]
+
+#### 4. Lane-line pixels identification and fit theme a polynomial
+
+Then I used histogram fiture on bottom half of warped image to determine where is left and right lane-lines located. It will give a start point to search the image for rest of points. We devide image to 9 horizontal slice and in each half of them searching for lane line pixel, if ther was more than a threshold amount pixel detected then we relocalize the window center. Continuing this returns left and right lane lines. In below you see histogram and then detected pixels. The green boxes are the search window described before.
+
+![alt text][image6]
+
+![alt text][image7]
+
+However this process can be slow, so in next coming frame that because of slightly small time gap between them we can consider it almost very close to current frame. Due to this assumption for next frame we will search around last fited polynomial. In below you see the fitted poly in yellow and the area of search for next frame in transparent green.
+
+![alt text][image11]
+
 #### 5. Describe how (and identify where in your code) you calculated the radius of curvature of the lane and the position of the vehicle with respect to center.
 
+$$R_{curve} = \frac{(1+(\frac{dx}{dy})^2)^{\frac{3}{2}}}{\frac{d^2x}{dy^2}}\;\;\;\;eq.\,1$$
+
+Our second order polynomial can be describe as below:
+
+$$ x = Ay^2 + By + C\;\;\;\;eq.\,2$$
+
+Replacing $eq.\,2$ in $eq.\,1$ results in $eq.\,3$:
+
+$$ R_{curve} = \frac{(1+ (2Ay+B)^2)^{\frac{3}{2}}}{{|2A|}}$$
+
 I did this in lines # through # in my code in `my_other_file.py`
+rad.
+![alt text][image9]
+offset
+![alt text][image10]
 
 #### 6. Provide an example image of your result plotted back down onto the road such that the lane area is identified clearly.
 
 I implemented this step in lines # through # in my code in `yet_another_file.py` in the function `map_lane()`.  Here is an example of my result on a test image:
-
-![alt text][image6]
+from this
+![alt text][image8]
+to this
+![alt text][image12]
 
 ---
 
@@ -116,6 +149,7 @@ I implemented this step in lines # through # in my code in `yet_another_file.py`
 
 #### 1. Provide a link to your final video output.  Your pipeline should perform reasonably well on the entire project video (wobbly lines are ok but no catastrophic failures that would cause the car to drive off the road!).
 
+each frame looks like![alt text][image13]
 Here's a [link to my video result](./project_video.mp4)
 
 ---
